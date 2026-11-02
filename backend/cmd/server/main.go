@@ -18,18 +18,18 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Home\n")
 }
 
-type FavouriteSite struct {
-	Name        string
-	Description string
-	URL         string
-}
-
 func sites() []FavouriteSite {
 	return []FavouriteSite{
 		{Name: "boardgamegeek", Description: "A place where you can browse great boardgames", URL: "https://boardgamegeek.com/"},
 		{Name: "krillion.io", Description: "3 min long daily game", URL: "https://krillion.io"},
 		{Name: "localhost", Description: "Different for everyone", URL: "http://127.0.0.1"},
 	}
+}
+
+type FavouriteSite struct {
+	Name        string
+	Description string
+	URL         string
 }
 
 func main() {
