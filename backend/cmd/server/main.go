@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 )
@@ -9,13 +10,36 @@ import (
 func pathHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "get path\n")
 }
-func helloHandler(w http.ResponseWriter, req *http.Request) {
-	for _, p := range sites() {
-		fmt.Fprintf(w, "%s - %s (%s)\n", p.Name, p.Description, p.URL)
+func sitesHandler(w http.ResponseWriter, req *http.Request) {
+	t, err := template.ParseFiles("templates/layout.html", "templates/sites.html")
+	if err != nil {
+		http.Error(w, "template error", http.StatusInternalServerError)
+		return
+	}
+	data := struct {
+		Title string
+		Sites []FavouriteSite
+	}{
+		Title: "Sites",
+		Sites: sites(),
+	}
+
+	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
+		log.Println(err)
 	}
 }
 func homeHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Home\n")
+	t, err := template.ParseFiles("templates/layout.html", "templates/home.html")
+	if err != nil {
+		http.Error(w, "template error", http.StatusInternalServerError)
+		return
+	}
+
+	data := struct{ Title string }{Title: "Home"}
+
+	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
+		log.Println(err)
+	}
 }
 
 func sites() []FavouriteSite {
@@ -34,8 +58,8 @@ type FavouriteSite struct {
 
 func main() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /path/blint", pathHandler)
-	mux.HandleFunc("GET /hello", helloHandler)
+	mux.HandleFunc("GET /path/", pathHandler)
+	mux.HandleFunc("GET /sites", sitesHandler)
 	// /{$} means "exactly / and nothing else"
 	mux.HandleFunc("GET /{$}", homeHandler)
 

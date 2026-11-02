@@ -1,0 +1,8 @@
+  {{define "content"}}
+  <h1>Favourite sites</h1>
+  <ul>
+  {{range .Sites}}
+      <li><a href="{{.URL}}">{{.Name}}</a>: {{.Description}}</li>
+  {{end}}
+  </ul>
+  {{end}}
