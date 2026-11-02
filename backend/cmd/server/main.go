@@ -1,28 +1,29 @@
 package main
 
 import (
-    "fmt"
-    "net/http"
+	"fmt"
+	"log"
+	"net/http"
 )
 
-func hello(w http.ResponseWriter, req *http.Request) {
-
-    fmt.Fprintf(w, "hello\n")
+func pathHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "get path\n")
 }
+func helloHandler(w http.ResponseWriter, req *http.Request) {
 
-func headers(w http.ResponseWriter, req *http.Request) {
-
-    for name, headers := range req.Header {
-        for _, h := range headers {
-            fmt.Fprintf(w, "%v: %v\n", name, h)
-        }
-    }
+	fmt.Fprintf(w, "hello\n")
 }
-
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Home\n")
+}
 func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /path/blint", pathHandler)
+	mux.HandleFunc("GET /hello", helloHandler)
+	// /{$} means "exactly / and nothing else"
+	mux.HandleFunc("GET /{$}", homeHandler)
 
-    http.HandleFunc("/hello", hello)
-    http.HandleFunc("/headers", headers)
-
-    http.ListenAndServe(":8090", nil)
+	if err := http.ListenAndServe(":8090", mux); err != nil {
+		log.Fatal(err)
+	}
 }
