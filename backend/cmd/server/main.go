@@ -7,10 +7,10 @@ import (
 	"net/http"
 )
 
-func pathHandler(w http.ResponseWriter, r *http.Request) {
+func pathHandler(w http.ResponseWriter, _ *http.Request) {
 	fmt.Fprintf(w, "get path\n")
 }
-func sitesHandler(w http.ResponseWriter, req *http.Request) {
+func sitesHandler(w http.ResponseWriter, _ *http.Request) {
 	t, err := template.ParseFiles("templates/layout.html", "templates/sites.html")
 	if err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
@@ -56,12 +56,46 @@ type FavouriteSite struct {
 	URL         string
 }
 
+func activitiesHandler(w http.ResponseWriter, r *http.Request) {
+	t, err := template.ParseFiles("templates/layout.html", "templates/activities.html")
+	if err != nil {
+		http.Error(w, "template error", http.StatusInternalServerError)
+		return
+	}
+	data := struct {
+		Title      string
+		Activities []Activity
+	}{
+		Title:      "Activities",
+		Activities: activities(),
+	}
+	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
+		log.Println(err)
+	}
+}
+
+func activities() []Activity {
+	return []Activity{
+		{Name: "Bouldering", Date: "2026.10.28", Duration: "2h", Effort: "6"},
+		{Name: "Street Workout", Date: "2026.11.07", Duration: "1h", Effort: "6"},
+		{Name: "Bouldering", Date: "2026.11.04", Duration: "2h", Effort: "8"},
+	}
+}
+
+type Activity struct {
+	Date     string
+	Name     string
+	Duration string
+	Effort   string
+}
+
 func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /path/", pathHandler)
 	mux.HandleFunc("GET /sites", sitesHandler)
 	// /{$} means "exactly / and nothing else"
 	mux.HandleFunc("GET /{$}", homeHandler)
+	mux.HandleFunc("GET /activities", activitiesHandler)
 
 	if err := http.ListenAndServe(":8090", mux); err != nil {
 		log.Fatal(err)
