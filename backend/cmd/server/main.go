@@ -1,21 +1,11 @@
 package main
 
 import (
-	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 )
 
-func pathHandler(w http.ResponseWriter, _ *http.Request) {
-	fmt.Fprintf(w, "get path\n")
-}
 func sitesHandler(w http.ResponseWriter, _ *http.Request) {
-	t, err := template.ParseFiles("templates/layout.html", "templates/sites.html")
-	if err != nil {
-		http.Error(w, "template error", http.StatusInternalServerError)
-		return
-	}
 	data := struct {
 		Title string
 		Sites []FavouriteSite
@@ -23,23 +13,11 @@ func sitesHandler(w http.ResponseWriter, _ *http.Request) {
 		Title: "Sites",
 		Sites: sites(),
 	}
-
-	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
-		log.Println(err)
-	}
+	render(w, "sites", data)
 }
 func homeHandler(w http.ResponseWriter, r *http.Request) {
-	t, err := template.ParseFiles("templates/layout.html", "templates/home.html")
-	if err != nil {
-		http.Error(w, "template error", http.StatusInternalServerError)
-		return
-	}
-
 	data := struct{ Title string }{Title: "Home"}
-
-	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
-		log.Println(err)
-	}
+	render(w, "home", data)
 }
 
 func sites() []FavouriteSite {
@@ -57,11 +35,6 @@ type FavouriteSite struct {
 }
 
 func activitiesHandler(w http.ResponseWriter, r *http.Request) {
-	t, err := template.ParseFiles("templates/layout.html", "templates/activities.html")
-	if err != nil {
-		http.Error(w, "template error", http.StatusInternalServerError)
-		return
-	}
 	data := struct {
 		Title      string
 		Activities []Activity
@@ -69,9 +42,7 @@ func activitiesHandler(w http.ResponseWriter, r *http.Request) {
 		Title:      "Activities",
 		Activities: activities(),
 	}
-	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
-		log.Println(err)
-	}
+	render(w, "activities", data)
 }
 
 func activities() []Activity {
@@ -91,7 +62,6 @@ type Activity struct {
 
 func main() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /path/", pathHandler)
 	mux.HandleFunc("GET /sites", sitesHandler)
 	// /{$} means "exactly / and nothing else"
 	mux.HandleFunc("GET /{$}", homeHandler)
