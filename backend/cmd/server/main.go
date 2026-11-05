@@ -1,8 +1,11 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
+
+	_ "modernc.org/sqlite"
 )
 
 func sitesHandler(w http.ResponseWriter, _ *http.Request) {
@@ -61,6 +64,36 @@ type Activity struct {
 }
 
 func main() {
+	db, err := sql.Open("sqlite", "blint.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		log.Fatal(err)
+	}
+	_, err = db.Exec(`
+	CREATE TABLE IF NOT EXISTS activities (
+    id       INTEGER PRIMARY KEY,
+    date     TEXT    NOT NULL,
+    name     TEXT    NOT NULL,
+    duration INTEGER NOT NULL,
+    effort   INTEGER NOT NULL CHECK (effort BETWEEN 1 AND 10)
+);`)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = db.Exec(
+		`INSERT INTO activities (date, name, duration,
+		effort) VALUES (?, ?, ?, ?)`,
+		"2026-10-28", "Bouldering", "120", "6",
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /sites", sitesHandler)
 	// /{$} means "exactly / and nothing else"
