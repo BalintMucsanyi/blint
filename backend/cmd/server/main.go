@@ -37,30 +37,48 @@ type FavouriteSite struct {
 	URL         string
 }
 
-func activitiesHandler(w http.ResponseWriter, r *http.Request) {
-	data := struct {
-		Title      string
-		Activities []Activity
-	}{
-		Title:      "Activities",
-		Activities: activities(),
+func activitiesHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		list, err := activities(db)
+		if err != nil {
+			http.Error(w, "database error", http.StatusInternalServerError)
+			return
+		}
+		data := struct {
+			Title      string
+			Activities []Activity
+		}{"Activities", list}
+		render(w, "activities", data)
 	}
-	render(w, "activities", data)
 }
 
-func activities() []Activity {
-	return []Activity{
-		{Name: "Bouldering", Date: "2026.10.28", Duration: "2h", Effort: "6"},
-		{Name: "Street Workout", Date: "2026.11.07", Duration: "1h", Effort: "6"},
-		{Name: "Bouldering", Date: "2026.11.04", Duration: "2h", Effort: "8"},
+func activities(db *sql.DB) ([]Activity, error) {
+	rows, err := db.Query("SELECT id, date, name, duration, effort FROM activities")
+	if err != nil {
+		return nil, err
 	}
+	defer rows.Close()
+
+	var list []Activity
+
+	for rows.Next() {
+		var a Activity
+		if err := rows.Scan(&a.ID, &a.Date, &a.Name, &a.Duration, &a.Effort); err != nil {
+		}
+		list = append(list, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return list, nil
 }
 
 type Activity struct {
+	ID       int
 	Date     string
 	Name     string
-	Duration string
-	Effort   string
+	Duration int
+	Effort   int
 }
 
 func main() {
@@ -85,20 +103,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	_, err = db.Exec(
-		`INSERT INTO activities (date, name, duration,
-		effort) VALUES (?, ?, ?, ?)`,
-		"2026-10-28", "Bouldering", "120", "6",
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /sites", sitesHandler)
 	// /{$} means "exactly / and nothing else"
 	mux.HandleFunc("GET /{$}", homeHandler)
-	mux.HandleFunc("GET /activities", activitiesHandler)
+	mux.HandleFunc("GET /activities", activitiesHandler(db))
 
 	if err := http.ListenAndServe(":8090", mux); err != nil {
 		log.Fatal(err)
