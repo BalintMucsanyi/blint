@@ -1,0 +1,8 @@
+  {{define "content"}}
+  <h1>Recent Activities</h1>
+  <ul>
+  {{range .Activities}}
+      <li>Date: {{.Date}}: Activity: {{.Name}} - Duration: {{.Duration}} - Intensity: {{.Effort}}</li>
+  {{end}}
+  </ul>
+  {{end}}

@@ -1,27 +1,26 @@
 package main
 
 import (
-	"fmt"
+	"database/sql"
 	"log"
 	"net/http"
+
+	_ "modernc.org/sqlite"
 )
 
-func pathHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "get path\n")
-}
-func helloHandler(w http.ResponseWriter, req *http.Request) {
-	for _, p := range sites() {
-		fmt.Fprintf(w, "%s - %s (%s)\n", p.Name, p.Description, p.URL)
+func sitesHandler(w http.ResponseWriter, _ *http.Request) {
+	data := struct {
+		Title string
+		Sites []FavouriteSite
+	}{
+		Title: "Sites",
+		Sites: sites(),
 	}
+	render(w, "sites", data)
 }
 func homeHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Home\n")
-}
-
-type FavouriteSite struct {
-	Name        string
-	Description string
-	URL         string
+	data := struct{ Title string }{Title: "Home"}
+	render(w, "home", data)
 }
 
 func sites() []FavouriteSite {
@@ -32,12 +31,83 @@ func sites() []FavouriteSite {
 	}
 }
 
+type FavouriteSite struct {
+	Name        string
+	Description string
+	URL         string
+}
+
+func activitiesHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		list, err := activities(db)
+		if err != nil {
+			http.Error(w, "database error", http.StatusInternalServerError)
+			return
+		}
+		data := struct {
+			Title      string
+			Activities []Activity
+		}{"Activities", list}
+		render(w, "activities", data)
+	}
+}
+
+func activities(db *sql.DB) ([]Activity, error) {
+	rows, err := db.Query("SELECT id, date, name, duration, effort FROM activities")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []Activity
+
+	for rows.Next() {
+		var a Activity
+		if err := rows.Scan(&a.ID, &a.Date, &a.Name, &a.Duration, &a.Effort); err != nil {
+		}
+		list = append(list, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+type Activity struct {
+	ID       int
+	Date     string
+	Name     string
+	Duration int
+	Effort   int
+}
+
 func main() {
+	db, err := sql.Open("sqlite", "blint.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		log.Fatal(err)
+	}
+	_, err = db.Exec(`
+	CREATE TABLE IF NOT EXISTS activities (
+    id       INTEGER PRIMARY KEY,
+    date     TEXT    NOT NULL,
+    name     TEXT    NOT NULL,
+    duration INTEGER NOT NULL,
+    effort   INTEGER NOT NULL CHECK (effort BETWEEN 1 AND 10)
+);`)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /path/blint", pathHandler)
-	mux.HandleFunc("GET /hello", helloHandler)
+	mux.HandleFunc("GET /sites", sitesHandler)
 	// /{$} means "exactly / and nothing else"
 	mux.HandleFunc("GET /{$}", homeHandler)
+	mux.HandleFunc("GET /activities", activitiesHandler(db))
 
 	if err := http.ListenAndServe(":8090", mux); err != nil {
 		log.Fatal(err)
