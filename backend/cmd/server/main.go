@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"strconv"
 
 	_ "modernc.org/sqlite"
 )
@@ -72,6 +73,36 @@ func activities(db *sql.DB) ([]Activity, error) {
 	}
 	return list, nil
 }
+func addActivity(db *sql.DB, a Activity) error {
+	_, err := db.Exec("INSERT INTO activities (date, name, duration, effort) VALUES (?, ?, ?, ?)", a.Date, a.Name, a.Duration, a.Effort)
+	return err
+}
+
+func addActivityHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		date := r.FormValue("date")
+		name := r.FormValue("name")
+
+		duration, err := strconv.Atoi(r.FormValue("duration"))
+		if err != nil {
+			http.Error(w, "duration must be a number", http.StatusBadRequest)
+			return
+		}
+		effort, err := strconv.Atoi(r.FormValue("effort"))
+		if err != nil {
+			http.Error(w, "effort must be a number", http.StatusBadRequest)
+			return
+		}
+
+		a := Activity{Date: date, Name: name, Duration: duration, Effort: effort}
+		if err := addActivity(db, a); err != nil {
+			log.Println(err)
+			http.Error(w, "database error", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/activities", http.StatusSeeOther)
+	}
+}
 
 type Activity struct {
 	ID       int
@@ -108,6 +139,7 @@ func main() {
 	// /{$} means "exactly / and nothing else"
 	mux.HandleFunc("GET /{$}", homeHandler)
 	mux.HandleFunc("GET /activities", activitiesHandler(db))
+	mux.HandleFunc("POST /activities", addActivityHandler(db))
 
 	if err := http.ListenAndServe(":8090", mux); err != nil {
 		log.Fatal(err)
