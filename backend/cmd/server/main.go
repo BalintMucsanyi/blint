@@ -54,7 +54,7 @@ func activitiesHandler(db *sql.DB) http.HandlerFunc {
 }
 
 func activities(db *sql.DB) ([]Activity, error) {
-	rows, err := db.Query("SELECT id, date, name, duration, effort FROM activities")
+	rows, err := db.Query("SELECT id, date, name, duration, effort FROM activities ORDER BY date DESC, id DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +104,30 @@ func addActivityHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+func deleteActivity(db *sql.DB, id int) error {
+	if _, err := db.Exec("DELETE from activities WHERE id = ?", id); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deleteActivityHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := r.PathValue("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+			return
+		}
+		if err := deleteActivity(db, id); err != nil {
+			log.Println(err)
+			http.Error(w, "error deleting activity", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/activities", http.StatusSeeOther)
+	}
+}
+
 type Activity struct {
 	ID       int
 	Date     string
@@ -140,6 +164,7 @@ func main() {
 	mux.HandleFunc("GET /{$}", homeHandler)
 	mux.HandleFunc("GET /activities", activitiesHandler(db))
 	mux.HandleFunc("POST /activities", addActivityHandler(db))
+	mux.HandleFunc("POST /activities/{id}/delete", deleteActivityHandler(db))
 
 	if err := http.ListenAndServe(":8090", mux); err != nil {
 		log.Fatal(err)
