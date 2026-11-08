@@ -2,7 +2,23 @@
   <h1>Favourite sites</h1>
   <ul>
   {{range .Sites}}
-      <li><a href="{{.URL}}">{{.Name}}</a>: {{.Description}}</li>
+      <li>
+        <a href="{{.URL}}">{{.Name}}</a>: {{.Description}}
+        <form method="POST" action="/sites/{{.ID}}/delete"
+            onsubmit="return confirm('Delete this site?')" style="display:inline">
+            <button type="submit">✕</button>
+        </form>
+      </li>
   {{end}}
   </ul>
+  <form method="POST" action="/sites">
+      <label for="Name">Name:</label><br>
+      <input type="text" id="Name" name="Name" required><br>
+      <label for="URL">URL:</label><br>
+      <input type="url" id="URL" name="URL" required><br>
+      <label for="Description">Description:</label><br>
+      <input type="text" id="Description" name="Description" required><br>
+      <input type="submit">
+  </form>
+
   {{end}}

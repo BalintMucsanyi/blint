@@ -9,30 +9,94 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func sitesHandler(w http.ResponseWriter, _ *http.Request) {
-	data := struct {
-		Title string
-		Sites []FavouriteSite
-	}{
-		Title: "Sites",
-		Sites: sites(),
-	}
-	render(w, "sites", data)
-}
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	data := struct{ Title string }{Title: "Home"}
 	render(w, "home", data)
 }
 
-func sites() []FavouriteSite {
-	return []FavouriteSite{
-		{Name: "boardgamegeek", Description: "A place where you can browse great boardgames", URL: "https://boardgamegeek.com/"},
-		{Name: "krillion.io", Description: "3 min long daily game", URL: "https://krillion.io"},
-		{Name: "localhost", Description: "Different for everyone", URL: "http://127.0.0.1"},
+func addSite(db *sql.DB, site Site) error {
+	_, err := db.Exec("INSERT INTO sites (name, URL, Description) VALUES (?, ?, ?)", site.Name, site.URL, site.Description)
+	return err
+}
+
+func addSiteHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		name := r.FormValue("Name")
+		url := r.FormValue("URL")
+		description := r.FormValue("Description")
+
+		site := Site{Name: name, URL: url, Description: description}
+		if err := addSite(db, site); err != nil {
+			log.Println(err)
+			http.Error(w, "database error", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/sites", http.StatusSeeOther)
 	}
 }
 
-type FavouriteSite struct {
+func sites(db *sql.DB) ([]Site, error) {
+	rows, err := db.Query("SELECT id, name, URL, description FROM sites ORDER BY name DESC, id DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []Site
+	for rows.Next() {
+		var site Site
+		if err := rows.Scan(&site.ID, &site.Name, &site.URL, &site.Description); err != nil {
+			return nil, err
+		}
+		list = append(list, site)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func deleteSite(db *sql.DB, id int) error {
+	_, err := db.Exec("DELETE FROM sites WHERE id = ?", id)
+	return err
+}
+
+func deleteSiteHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.Atoi(r.PathValue("id"))
+		if err != nil {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+			return
+		}
+		if err := deleteSite(db, id); err != nil {
+			log.Println(err)
+			http.Error(w, "error deleting site", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/sites", http.StatusSeeOther)
+	}
+}
+
+func sitesHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		list, err := sites(db)
+		if err != nil {
+			http.Error(w, "database error", http.StatusInternalServerError)
+			return
+		}
+		data := struct {
+			Title string
+			Sites []Site
+		}{
+			Title: "Sites",
+			Sites: list,
+		}
+		render(w, "sites", data)
+	}
+}
+
+type Site struct {
+	ID          int
 	Name        string
 	Description string
 	URL         string
@@ -158,8 +222,22 @@ func main() {
 		log.Fatal(err)
 	}
 
+	_, err = db.Exec(`
+	CREATE TABLE IF NOT EXISTS sites (
+	id			integer PRIMARY KEY,
+	name		TEXT NOT NULL,
+	URL			TEXT NOT NULL,
+	Description TEXT NOT NULL
+);`)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /sites", sitesHandler)
+	mux.HandleFunc("GET /sites", sitesHandler(db))
+	mux.HandleFunc("POST /sites", addSiteHandler(db))
+	mux.HandleFunc("POST /sites/{id}/delete", deleteSiteHandler(db))
+
 	// /{$} means "exactly / and nothing else"
 	mux.HandleFunc("GET /{$}", homeHandler)
 	mux.HandleFunc("GET /activities", activitiesHandler(db))
