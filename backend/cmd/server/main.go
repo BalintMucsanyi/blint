@@ -13,17 +13,25 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	render(w, "home", data)
 }
 
-func main() {
-	db, err := sql.Open("sqlite", "blint.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
+func routes(db *sql.DB) *http.ServeMux {
+	mux := http.NewServeMux()
 
-	if err := db.Ping(); err != nil {
-		log.Fatal(err)
-	}
-	_, err = db.Exec(`
+	// /{$} means "exactly / and nothing else"
+	mux.HandleFunc("GET /{$}", homeHandler)
+
+	mux.HandleFunc("GET /sites", sitesHandler(db))
+	mux.HandleFunc("POST /sites", addSiteHandler(db))
+	mux.HandleFunc("POST /sites/{id}/delete", deleteSiteHandler(db))
+
+	mux.HandleFunc("GET /activities", activitiesHandler(db))
+	mux.HandleFunc("POST /activities", addActivityHandler(db))
+	mux.HandleFunc("POST /activities/{id}/delete", deleteActivityHandler(db))
+
+	return mux
+}
+
+func initDB(db *sql.DB) error {
+	_, err := db.Exec(`
 	CREATE TABLE IF NOT EXISTS activities (
     id       INTEGER PRIMARY KEY,
     date     TEXT    NOT NULL,
@@ -32,30 +40,39 @@ func main() {
     effort   INTEGER NOT NULL CHECK (effort BETWEEN 1 AND 10)
 );`)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	_, err = db.Exec(`
 	CREATE TABLE IF NOT EXISTS sites (
-	id			integer PRIMARY KEY,
+	id			INTEGER PRIMARY KEY,
 	name		TEXT NOT NULL,
 	URL			TEXT NOT NULL,
 	Description TEXT NOT NULL
 );`)
 	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func main() {
+	db, err := sql.Open("sqlite", "blint.db")
+	if err != nil {
 		log.Fatal(err)
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /sites", sitesHandler(db))
-	mux.HandleFunc("POST /sites", addSiteHandler(db))
-	mux.HandleFunc("POST /sites/{id}/delete", deleteSiteHandler(db))
+	defer db.Close()
 
-	// /{$} means "exactly / and nothing else"
-	mux.HandleFunc("GET /{$}", homeHandler)
-	mux.HandleFunc("GET /activities", activitiesHandler(db))
-	mux.HandleFunc("POST /activities", addActivityHandler(db))
-	mux.HandleFunc("POST /activities/{id}/delete", deleteActivityHandler(db))
+	if err := db.Ping(); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := initDB(db); err != nil {
+		log.Fatal(err)
+	}
+
+	mux := routes(db)
 
 	if err := http.ListenAndServe(":8090", mux); err != nil {
 		log.Fatal(err)
