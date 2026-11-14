@@ -13,19 +13,19 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	render(w, "home", data)
 }
 
-func routes(db *sql.DB) *http.ServeMux {
+func routes(store Store) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// /{$} means "exactly / and nothing else"
 	mux.HandleFunc("GET /{$}", homeHandler)
 
-	mux.HandleFunc("GET /sites", sitesHandler(db))
-	mux.HandleFunc("POST /sites", addSiteHandler(db))
-	mux.HandleFunc("POST /sites/{id}/delete", deleteSiteHandler(db))
+	mux.HandleFunc("GET /sites", sitesHandler(store.db))
+	mux.HandleFunc("POST /sites", addSiteHandler(store.db))
+	mux.HandleFunc("POST /sites/{id}/delete", deleteSiteHandler(store.db))
 
-	mux.HandleFunc("GET /activities", activitiesHandler(db))
-	mux.HandleFunc("POST /activities", addActivityHandler(db))
-	mux.HandleFunc("POST /activities/{id}/delete", deleteActivityHandler(db))
+	mux.HandleFunc("GET /activities", activitiesHandler(&store))
+	mux.HandleFunc("POST /activities", addActivityHandler(&store))
+	mux.HandleFunc("POST /activities/{id}/delete", deleteActivityHandler(&store))
 
 	return mux
 }
@@ -57,6 +57,7 @@ func initDB(db *sql.DB) error {
 }
 
 func main() {
+
 	db, err := sql.Open("sqlite", "blint.db")
 	if err != nil {
 		log.Fatal(err)
@@ -71,8 +72,9 @@ func main() {
 	if err := initDB(db); err != nil {
 		log.Fatal(err)
 	}
+	store := NewStore(db)
 
-	mux := routes(db)
+	mux := routes(*store)
 
 	if err := http.ListenAndServe(":8090", mux); err != nil {
 		log.Fatal(err)

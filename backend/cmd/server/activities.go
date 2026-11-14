@@ -1,15 +1,14 @@
 package main
 
 import (
-	"database/sql"
 	"log"
 	"net/http"
 	"strconv"
 )
 
-func activitiesHandler(db *sql.DB) http.HandlerFunc {
+func activitiesHandler(store *Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		list, err := activities(db)
+		list, err := store.activities()
 		if err != nil {
 			http.Error(w, "database error", http.StatusInternalServerError)
 			return
@@ -22,8 +21,8 @@ func activitiesHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func activities(db *sql.DB) ([]Activity, error) {
-	rows, err := db.Query("SELECT id, date, name, duration, effort FROM activities ORDER BY date DESC, id DESC")
+func (s *Store) activities() ([]Activity, error) {
+	rows, err := s.db.Query("SELECT id, date, name, duration, effort FROM activities ORDER BY date DESC, id DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -42,12 +41,12 @@ func activities(db *sql.DB) ([]Activity, error) {
 	}
 	return list, nil
 }
-func addActivity(db *sql.DB, a Activity) error {
-	_, err := db.Exec("INSERT INTO activities (date, name, duration, effort) VALUES (?, ?, ?, ?)", a.Date, a.Name, a.Duration, a.Effort)
+func (s *Store) AddActivity(a Activity) error {
+	_, err := s.db.Exec("INSERT INTO activities (date, name, duration, effort) VALUES (?, ?, ?, ?)", a.Date, a.Name, a.Duration, a.Effort)
 	return err
 }
 
-func addActivityHandler(db *sql.DB) http.HandlerFunc {
+func addActivityHandler(store *Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		date := r.FormValue("date")
 		name := r.FormValue("name")
@@ -64,7 +63,7 @@ func addActivityHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		a := Activity{Date: date, Name: name, Duration: duration, Effort: effort}
-		if err := addActivity(db, a); err != nil {
+		if err := store.AddActivity(a); err != nil {
 			log.Println(err)
 			http.Error(w, "database error", http.StatusInternalServerError)
 			return
@@ -73,14 +72,14 @@ func addActivityHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func deleteActivity(db *sql.DB, id int) error {
-	if _, err := db.Exec("DELETE from activities WHERE id = ?", id); err != nil {
+func (s *Store) DeleteActivity(id int) error {
+	if _, err := s.db.Exec("DELETE from activities WHERE id = ?", id); err != nil {
 		return err
 	}
 	return nil
 }
 
-func deleteActivityHandler(db *sql.DB) http.HandlerFunc {
+func deleteActivityHandler(store *Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := r.PathValue("id")
 		id, err := strconv.Atoi(idStr)
@@ -88,7 +87,7 @@ func deleteActivityHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "invalid id", http.StatusBadRequest)
 			return
 		}
-		if err := deleteActivity(db, id); err != nil {
+		if err := store.DeleteActivity(id); err != nil {
 			log.Println(err)
 			http.Error(w, "error deleting activity", http.StatusInternalServerError)
 			return
